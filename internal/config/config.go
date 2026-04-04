@@ -17,6 +17,7 @@ type Conf struct {
 	Storage       *string `yaml:"storage"`
 	Directory     *string `yaml:"directory"`
 	HideDownloads *bool   `yaml:"hideDownloads"`
+	Styles        *string `yaml:"styles"`
 	heading       string  `yaml:"heading"`
 	footer        string  `yaml:"footer"`
 	Heading       template.HTML
@@ -37,6 +38,7 @@ func Config() Conf {
 		Port:          populateKeyInt(cfg.Port, "PORT", 8080),
 		Directory:     populateKey(cfg.Directory, "DIRECTORY", "/srv/http/"),
 		HideDownloads: populateKeyBool(cfg.HideDownloads, "HIDEDOWNLOADS", false),
+		Styles:        populateKey(cfg.Styles, "STYLES", "styles.css"),
 		Heading:       template.HTML(cfg.Heading),
 		Footer:        template.HTML(cfg.Footer),
 	}

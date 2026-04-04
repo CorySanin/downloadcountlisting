@@ -31,6 +31,7 @@ type (
 		Subdirectories []string
 		Files          []FileEntry
 		HideDownloads  bool
+		Styles         string
 		Heading        template.HTML
 		Footer         template.HTML
 	}
@@ -77,6 +78,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			Subdirectories: childDirs,
 			Files:          childFiles,
 			HideDownloads:  *conf.HideDownloads,
+			Styles:         *conf.Styles,
 			Heading:        conf.Heading,
 			Footer:         conf.Footer,
 		}

@@ -1,0 +1,14 @@
+{
+  "name": "downloadcountlistingstatic",
+  "version": "1.0.0",
+  "description": "Files for downloadcountlisting",
+  "license": "AGPL-3.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc && npx build-shit"
+  },
+  "devDependencies": {
+    "forking-build-shit": "^1.0.5",
+    "typescript": "^6.0.2"
+  }
+}
