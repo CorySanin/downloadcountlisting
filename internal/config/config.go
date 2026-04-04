@@ -25,10 +25,10 @@ func Config() Conf {
 		log.Print(err)
 	}
 	return Conf{
-		Storage:       PopulateKey(cfg.Storage, "STORAGE", "downloadcount.db"),
-		Port:          PopulateKeyInt(cfg.Port, "PORT", 8080),
-		Directory:     PopulateKey(cfg.Directory, "DIRECTORY", "/srv/http/"),
-		HideDownloads: PopulateKeyBool(cfg.HideDownloads, "HIDEDOWNLOADS", false),
+		Storage:       populateKey(cfg.Storage, "STORAGE", "downloadcount.db"),
+		Port:          populateKeyInt(cfg.Port, "PORT", 8080),
+		Directory:     populateKey(cfg.Directory, "DIRECTORY", "/srv/http/"),
+		HideDownloads: populateKeyBool(cfg.HideDownloads, "HIDEDOWNLOADS", false),
 	}
 }
 
@@ -40,7 +40,7 @@ func envOrDefault(key string, fallback string) string {
 	return fallback
 }
 
-func PopulateKey(fileCfg *string, envKey string, fallback string) *string {
+func populateKey(fileCfg *string, envKey string, fallback string) *string {
 	val, ok := os.LookupEnv(envKey)
 	if ok {
 		return &val
@@ -51,7 +51,7 @@ func PopulateKey(fileCfg *string, envKey string, fallback string) *string {
 	return &fallback
 }
 
-func PopulateKeyInt(fileCfg *int, envKey string, fallback int) *int {
+func populateKeyInt(fileCfg *int, envKey string, fallback int) *int {
 	val, ok := os.LookupEnv(envKey)
 	if ok {
 		i, err := strconv.Atoi(val)
@@ -65,7 +65,7 @@ func PopulateKeyInt(fileCfg *int, envKey string, fallback int) *int {
 	return &fallback
 }
 
-func PopulateKeyBool(fileCfg *bool, envKey string, fallback bool) *bool {
+func populateKeyBool(fileCfg *bool, envKey string, fallback bool) *bool {
 	val, ok := os.LookupEnv(envKey)
 	if ok && val != "" {
 		var result = strings.ToLower(val) == "true" || val == "1"

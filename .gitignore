@@ -36,3 +36,4 @@ go.work.sum
 
 config.yml
 root/
+*.db

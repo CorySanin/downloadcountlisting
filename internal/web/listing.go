@@ -13,30 +13,35 @@ import (
 	"time"
 
 	"github.com/CorySanin/downloadcountlisting/internal/config"
+	"github.com/CorySanin/downloadcountlisting/pkg/storage"
 )
 
-type FileEntry struct {
-	Filename string
-	Size     int64
-	Date     time.Time
-	DL       *int
-	DLTotal  *int
-}
+type (
+	FileEntry struct {
+		Filename string
+		Size     int64
+		Date     time.Time
+		DL       int
+		DLTotal  int
+	}
 
-type ListingData struct {
-	Path           string
-	Subdirectories []string
-	Files          []FileEntry
-	HideDownloads  bool
-}
+	ListingData struct {
+		Path           string
+		Subdirectories []string
+		Files          []FileEntry
+		HideDownloads  bool
+	}
+)
 
 //go:embed templates/*
 var templateFS embed.FS
 var conf config.Conf
 var templates *template.Template
+var store storage.Storage
 
-func InitWeb(cfg config.Conf) {
+func InitWeb(cfg config.Conf, st storage.Storage) {
 	conf = cfg
+	store = st
 	// templates = template.Must(template.ParseGlob(filepath.Join("internal", "web", "templates", "*.html")))
 	mytemplates := []string{"layout.html"}
 	for i, v := range mytemplates {
@@ -70,7 +75,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if file, err := os.Open(destination); err == nil {
 		defer file.Close()
-		_, fileName := filepath.Split(destination)
+		fp, fileName := filepath.Split(destination)
 		fileStat, err := file.Stat()
 		if err != nil {
 			http.Error(w, "Internal server error.", 500)
@@ -80,6 +85,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", r.Header.Get("Content-Type")) // TODO: set content-type accordingly
 		w.Header().Set("Content-Length", strconv.FormatInt(fileStat.Size(), 10))
 		http.ServeContent(w, r, fileName, fileStat.ModTime(), file)
+		store.IncrementDownload(storage.Download{
+			Path:     fp,
+			Filename: fileName,
+		})
 		return
 	}
 	http.Error(w, "404 file not found", 404)
@@ -91,6 +100,10 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func getChildren(path string) ([]string, []FileEntry, error) {
+	ch := make(chan map[string]storage.Totals)
+	if !*conf.HideDownloads {
+		go store.GetTotalsByPath(path, ch)
+	}
 	entires, err := os.ReadDir(path)
 	if err != nil {
 		return nil, nil, err
@@ -109,6 +122,10 @@ func getChildren(path string) ([]string, []FileEntry, error) {
 	childFiles := make([]FileEntry, fileCount)
 	dirCount = 0
 	fileCount = 0
+	var totalsMap map[string]storage.Totals = nil
+	if !*conf.HideDownloads {
+		totalsMap = <-ch
+	}
 
 	for _, v := range entires {
 		if v.IsDir() {
@@ -121,6 +138,12 @@ func getChildren(path string) ([]string, []FileEntry, error) {
 			if info, err := v.Info(); err == nil {
 				fEntry.Size = info.Size()
 				fEntry.Date = info.ModTime()
+			}
+			if totalsMap != nil {
+				if t, ok := totalsMap[v.Name()]; ok {
+					fEntry.DL = t.Recent
+					fEntry.DLTotal = t.All
+				}
 			}
 			childFiles[fileCount] = fEntry
 			fileCount++
