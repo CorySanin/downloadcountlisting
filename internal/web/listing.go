@@ -27,6 +27,7 @@ type (
 	}
 
 	ListingData struct {
+		Title          string
 		Path           string
 		Subdirectories []string
 		Files          []FileEntry
@@ -75,6 +76,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 	if childDirs, childFiles, err := getChildren(destination, r.URL.Path != "/"); err == nil {
 		var data = ListingData{
+			Title:          *conf.Title,
 			Path:           r.URL.Path,
 			Subdirectories: childDirs,
 			Files:          childFiles,

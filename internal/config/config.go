@@ -14,6 +14,7 @@ import (
 
 type Conf struct {
 	Port          *int    `yaml:"port"`
+	Title         *string `yaml:"title"`
 	Storage       *string `yaml:"storage"`
 	Directory     *string `yaml:"directory"`
 	Styles        *string `yaml:"styles"`
@@ -35,6 +36,7 @@ func Config() Conf {
 		log.Print(err)
 	}
 	return Conf{
+		Title:         populateKey(cfg.Title, "TITLE", new(string("Index of "))),
 		Storage:       populateKey(cfg.Storage, "STORAGE", new(string("downloadcount.db"))),
 		Port:          populateKeyInt(cfg.Port, "PORT", new(int(8080))),
 		Directory:     populateKey(cfg.Directory, "DIRECTORY", new(string("/srv/http/"))),
