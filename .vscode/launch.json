@@ -13,7 +13,8 @@
             "program": "${workspaceRoot}/cmd/downloadcountlisting/main.go",
             "env": {
                 "CONFIG": "${workspaceRoot}/config.yml",
-                "DIRECTORY": "${workspaceRoot}/root/"
+                "DIRECTORY": "${workspaceRoot}/root/",
+                "STORAGE": "${workspaceRoot}/downloadcount.db"
             },
             "cwd": "${workspaceRoot}"
         }

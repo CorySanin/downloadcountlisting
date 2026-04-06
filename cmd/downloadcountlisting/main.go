@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"path"
 	"strings"
 
 	"github.com/CorySanin/downloadcountlisting/internal/config"
@@ -13,6 +15,7 @@ import (
 
 func main() {
 	conf := config.Config()
+	os.MkdirAll(path.Dir(*conf.Storage), 0755)
 	storage := storage.New(*conf.Storage)
 	web.InitWeb(conf, storage)
 	http.Handle("/.static/", http.StripPrefix("/.static", notFoundOnDir(http.FileServer(http.Dir("./static")))))

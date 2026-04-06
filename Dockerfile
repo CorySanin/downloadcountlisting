@@ -9,7 +9,7 @@ COPY --link --exclude=assets/ ./static-src/ .
 ENV STYLEOUTDIR=staging/static/css/
 RUN mkdir staging && npm run build
 WORKDIR /usr/src/static/staging
-RUN mkdir http
+RUN mkdir http data && chown 65532:65532 data
 
 FROM golang:1-trixie AS builder
 
@@ -22,7 +22,7 @@ COPY --link --exclude=static/ --exclude=static-src/  . .
 
 RUN CGO_ENABLED=1 GOOS=linux go build -o /download-count-listing cmd/downloadcountlisting/main.go
 
-FROM gcr.io/distroless/base-debian13 AS deploy
+FROM gcr.io/distroless/base-debian13:nonroot AS deploy
 WORKDIR /srv
 
 ARG version=develop
@@ -41,6 +41,6 @@ LABEL org.opencontainers.image.revision="${githash}"
 LABEL org.opencontainers.image.created="${created}"
 
 COPY --link --from=static /usr/src/static/staging/ .
-COPY --link --from=builder /download-count-listing /download-count-listing
+COPY --link --from=builder --chown=root:root /download-count-listing /download-count-listing
 EXPOSE 8080
 CMD ["/download-count-listing"]

@@ -26,7 +26,7 @@ type Conf struct {
 
 func Config() Conf {
 	cfg := Conf{}
-	file, err := os.ReadFile(envOrDefault("CONFIG", "config.yml"))
+	file, err := os.ReadFile(envOrDefault("CONFIG", path.Join("data", "config.yml")))
 	if err != nil {
 		log.Print(err)
 	} else if err := yaml.Unmarshal(file, &cfg); err != nil {
@@ -34,7 +34,7 @@ func Config() Conf {
 	}
 	return Conf{
 		Title:         populateKey(cfg.Title, "TITLE", new(string("Index of "))),
-		Storage:       populateKey(cfg.Storage, "STORAGE", new(string("downloadcount.db"))),
+		Storage:       populateKey(cfg.Storage, "STORAGE", new(string(path.Join("data", "downloadcount.db")))),
 		Port:          populateKeyInt(cfg.Port, "PORT", new(int(8080))),
 		Directory:     populateKey(cfg.Directory, "DIRECTORY", new(string("/srv/http/"))),
 		Icons:         populateKeyBool(cfg.Icons, "ICONS", new(bool(true))),
