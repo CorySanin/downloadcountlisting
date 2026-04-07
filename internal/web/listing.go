@@ -4,9 +4,9 @@ import (
 	"embed"
 	"html/template"
 	"log"
+	"maps"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,7 +21,8 @@ type (
 	FileEntry struct {
 		Filename string
 		Size     string
-		Date     time.Time
+		Date     string
+		Time     string
 		DL       int
 		DLTotal  int
 	}
@@ -50,7 +51,7 @@ func InitWeb(cfg config.Conf, st storage.Storage) {
 	store = st
 	mytemplates := []string{"layout.html"}
 	for i, v := range mytemplates {
-		mytemplates[i] = path.Join("templates", v)
+		mytemplates[i] = filepath.Join("templates", v)
 	}
 	tmpl, err := template.ParseFS(templateFS, mytemplates...)
 	if err != nil {
@@ -68,28 +69,30 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Fatalf("Get directory failed: %v", err)
 	}
-	destination := path.Join(cDir, r.URL.Path[1:])
-	if !strings.HasPrefix(destination, cDir) {
+	destination := filepath.Join(cDir, r.URL.Path[1:])
+	if !strings.HasPrefix(destination+config.SeparatorString, cDir) {
 		http.Error(w, "Something went wrong", http.StatusBadRequest)
 		log.Printf("User tried accessing %s but was denied.", destination)
 		return
 	}
-	if childDirs, childFiles, err := getChildren(destination, r.URL.Path != "/"); err == nil {
+	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), r.URL.Path != "/"); err == nil {
+		normalizedDirname := *config.NormalizePath(r.URL.Path)
 		var data = ListingData{
 			Title:          *conf.Title,
-			Path:           r.URL.Path,
+			Path:           normalizedDirname,
 			Subdirectories: childDirs,
 			Files:          childFiles,
 			Icons:          *conf.Icons,
 			HideDownloads:  *conf.HideDownloads,
 			Styles:         conf.Styles,
-			Heading:        template.HTML(strings.ReplaceAll(*conf.Heading, "%path%", template.HTMLEscapeString(r.URL.Path))),
-			Footer:         template.HTML(strings.ReplaceAll(*conf.Footer, "%path%", template.HTMLEscapeString(r.URL.Path))),
+			Heading:        template.HTML(strings.ReplaceAll(*conf.Heading, "%path%", template.HTMLEscapeString(normalizedDirname))),
+			Footer:         template.HTML(strings.ReplaceAll(*conf.Footer, "%path%", template.HTMLEscapeString(normalizedDirname))),
 		}
 		if err := templates.ExecuteTemplate(w, "layout.html", data); err != nil {
 			http.Error(w, "Something went wrong", http.StatusInternalServerError)
 			log.Default().Print(err.Error())
 		}
+		<-ch
 		return
 	} else if file, err := os.Open(destination); err == nil {
 		defer file.Close()
@@ -107,8 +110,10 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		http.ServeContent(rec, r, fileName, fileStat.ModTime(), file)
 		if rec.success() {
 			store.IncrementDownload(storage.Download{
-				Path:         fp,
-				Filename:     fileName,
+				DownloadIndex: storage.DownloadIndex{
+					Path:     fp,
+					Filename: fileName,
+				},
 				AccessDomain: r.Host,
 				UserAgent:    r.UserAgent(),
 			})
@@ -123,14 +128,12 @@ func apiHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "API not yet implemented", 404)
 }
 
-func getChildren(path string, hasParent bool) ([]string, []FileEntry, error) {
+func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, error) {
 	ch := make(chan map[string]storage.Totals)
-	if !*conf.HideDownloads {
-		go store.GetTotalsByPath(path, ch)
-	}
+	go store.GetTotalsByPath(path, ch)
 	entires, err := os.ReadDir(path)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	dirCount := 0
 	if hasParent {
@@ -149,10 +152,7 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, error) {
 	childFiles := make([]FileEntry, fileCount)
 	dirCount = 0
 	fileCount = 0
-	var totalsMap map[string]storage.Totals = nil
-	if !*conf.HideDownloads {
-		totalsMap = <-ch
-	}
+	totalsMap := <-ch
 
 	if hasParent {
 		childDirs[dirCount] = ".."
@@ -169,9 +169,11 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, error) {
 			}
 			if info, err := v.Info(); err == nil {
 				fEntry.Size = humanize.IBytes(uint64(info.Size()))
-				fEntry.Date = info.ModTime()
+				modtime := info.ModTime()
+				fEntry.Date = modtime.Format(time.DateOnly)
+				fEntry.Time = modtime.Format("15:04:05 -0700")
 			}
-			if totalsMap != nil {
+			if !*conf.HideDownloads && totalsMap != nil {
 				if t, ok := totalsMap[v.Name()]; ok {
 					fEntry.DL = t.Recent
 					fEntry.DLTotal = t.All
@@ -181,5 +183,32 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, error) {
 			fileCount++
 		}
 	}
-	return childDirs, childFiles, nil
+	cleanup := make(chan int)
+	go cleanUpRemovedFiles(path, childFiles, totalsMap, cleanup)
+	return childDirs, childFiles, cleanup, nil
+}
+
+func cleanUpRemovedFiles(p string, childFiles []FileEntry, totals map[string]storage.Totals, ch chan int) {
+	for _, v := range childFiles {
+		maps.DeleteFunc(totals, func(key string, value storage.Totals) bool {
+			return v.Filename == key
+		})
+	}
+	dls := make([]storage.DownloadIndex, 0, len(totals))
+	for k := range totals {
+		log.Printf("No longer exists: %s", filepath.Join(p, k))
+		dls = append(dls, storage.DownloadIndex{
+			Path:     p,
+			Filename: k,
+		})
+	}
+	if err := store.RemoveDownloads(dls); err != nil {
+		log.Printf("Failed removing %d rows: %v", len(dls), err)
+		ch <- -1
+		return
+	}
+	if len(dls) > 0 {
+		log.Printf("Removed %d rows", len(dls))
+	}
+	ch <- len(dls)
 }

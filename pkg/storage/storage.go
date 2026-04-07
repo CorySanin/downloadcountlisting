@@ -6,8 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"log"
-	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -19,9 +18,13 @@ import (
 var migrationsFs embed.FS
 
 type (
+	DownloadIndex struct {
+		Path     string
+		Filename string
+	}
+
 	Download struct {
-		Path         string
-		Filename     string
+		DownloadIndex
 		AccessDomain string
 		UserAgent    string
 		Timestamp    time.Time
@@ -42,6 +45,17 @@ type (
 	}
 )
 
+func (store *Storage) RemoveDownloads(dls []DownloadIndex) error {
+	args := make([]any, len(dls)*2)
+	for i, dl := range dls {
+		args[i*2] = dl.Path
+		args[i*2+1] = dl.Filename
+	}
+	cmd := strings.Repeat("DELETE FROM downloads WHERE Path = ? AND Filename = ? ; ", len(dls))
+	_, err := store.db.Exec(cmd, args...)
+	return err
+}
+
 func (store *Storage) IncrementDownload(params Download) {
 	if _, err := store.db.Exec("INSERT INTO downloads (Path,Filename,Timestamp) VALUES (?, ?, ?)", params.Path, params.Filename, time.Now()); err != nil {
 		log.Printf("Failed to insert download: %v", err)
@@ -49,8 +63,7 @@ func (store *Storage) IncrementDownload(params Download) {
 }
 
 func (store *Storage) GetTotalsByPath(path string, c chan map[string]Totals) {
-	separator := string(os.PathSeparator)
-	m, err := store.getTotalsByPath(strings.TrimSuffix(path, separator) + separator)
+	m, err := store.getTotalsByPath(path)
 	if err != nil {
 		c <- nil
 		log.Printf("Failed to get totals for path %s: %v", path, err)
@@ -172,7 +185,7 @@ func getMigrations() []migration {
 		if err != nil {
 			log.Fatal(err)
 		}
-		q, err := migrationsFs.ReadFile(path.Join("migrations", v.Name()))
+		q, err := migrationsFs.ReadFile(filepath.Join("migrations", v.Name()))
 		if err != nil {
 			log.Fatalf("Failed to read embedded migration %s: %v", v.Name(), err)
 		}

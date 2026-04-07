@@ -4,7 +4,7 @@ import (
 	"errors"
 	"log"
 	"os"
-	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -28,9 +28,13 @@ type expectedType interface {
 	bool | int | string
 }
 
+const (
+	SeparatorString = string(os.PathSeparator)
+)
+
 func Config() Conf {
 	cfg := Conf{}
-	file, err := os.ReadFile(envOrDefault("CONFIG", path.Join("data", "config.yml")))
+	file, err := os.ReadFile(envOrDefault("CONFIG", filepath.Join("data", "config.yml")))
 	if err != nil {
 		log.Print(err)
 	} else if err := yaml.Unmarshal(file, &cfg); err != nil {
@@ -38,9 +42,9 @@ func Config() Conf {
 	}
 	return Conf{
 		Title:         populateKey(cfg.Title, "TITLE", new(string("Index of "))),
-		Storage:       populateKey(cfg.Storage, "STORAGE", new(string(path.Join("data", "downloadcount.db")))),
+		Storage:       populateKey(cfg.Storage, "STORAGE", new(string(filepath.Join("data", "downloadcount.db")))),
 		Port:          populateKey(cfg.Port, "PORT", new(int(8080))),
-		Directory:     populateKey(cfg.Directory, "DIRECTORY", new(string("/srv/http/"))),
+		Directory:     NormalizePath(*populateKey(cfg.Directory, "DIRECTORY", new(string("/srv/http/")))),
 		Icons:         populateKey(cfg.Icons, "ICONS", new(bool(true))),
 		HideDownloads: populateKey(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
 		Styles:        populateKey(cfg.Styles, "STYLES", new(string("styles.css"))),
@@ -54,7 +58,7 @@ func (cfg *Conf) GetDirectory() (string, error) {
 		return "", errors.New("No directory set in config")
 	}
 	if cfg.directory == "" {
-		cfg.directory = path.Join(*cfg.Directory)
+		cfg.directory = filepath.Join(*cfg.Directory)
 	}
 	return cfg.directory, nil
 }
@@ -96,4 +100,8 @@ func populateKey[T expectedType](fileCfg *T, envKey string, fallback *T) *T {
 		return fileCfg
 	}
 	return fallback
+}
+
+func NormalizePath(p string) *string {
+	return new(string(strings.TrimSuffix(p, SeparatorString) + SeparatorString))
 }
