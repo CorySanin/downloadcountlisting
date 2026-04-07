@@ -57,7 +57,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
   build_image:
-    name: Build Docker image
+    name: Build image
     strategy:
       matrix:
         arch:

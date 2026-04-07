@@ -24,6 +24,10 @@ type Conf struct {
 	directory     string
 }
 
+type expectedType interface {
+	bool | int | string
+}
+
 func Config() Conf {
 	cfg := Conf{}
 	file, err := os.ReadFile(envOrDefault("CONFIG", path.Join("data", "config.yml")))
@@ -35,10 +39,10 @@ func Config() Conf {
 	return Conf{
 		Title:         populateKey(cfg.Title, "TITLE", new(string("Index of "))),
 		Storage:       populateKey(cfg.Storage, "STORAGE", new(string(path.Join("data", "downloadcount.db")))),
-		Port:          populateKeyInt(cfg.Port, "PORT", new(int(8080))),
+		Port:          populateKey(cfg.Port, "PORT", new(int(8080))),
 		Directory:     populateKey(cfg.Directory, "DIRECTORY", new(string("/srv/http/"))),
-		Icons:         populateKeyBool(cfg.Icons, "ICONS", new(bool(true))),
-		HideDownloads: populateKeyBool(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
+		Icons:         populateKey(cfg.Icons, "ICONS", new(bool(true))),
+		HideDownloads: populateKey(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
 		Styles:        populateKey(cfg.Styles, "STYLES", new(string("styles.css"))),
 		Heading:       populateKey(cfg.Heading, "HEADING", new(string("<h1>Index of <span id=\"path\">%path%</span></h1>"))),
 		Footer:        populateKey(cfg.Footer, "FOOTER", new(string(""))),
@@ -63,36 +67,30 @@ func envOrDefault(key string, fallback string) string {
 	return fallback
 }
 
-func populateKey(fileCfg *string, envKey string, fallback *string) *string {
+func populateKey[T expectedType](fileCfg *T, envKey string, fallback *T) *T {
 	val, ok := os.LookupEnv(envKey)
 	if ok {
-		return &val
-	}
-	if fileCfg != nil {
-		return fileCfg
-	}
-	return fallback
-}
-
-func populateKeyInt(fileCfg *int, envKey string, fallback *int) *int {
-	val, ok := os.LookupEnv(envKey)
-	if ok {
-		i, err := strconv.Atoi(val)
-		if err == nil {
-			return &i
+		switch any(*fallback).(type) {
+		case string:
+			if typed, ok := any(val).(T); ok {
+				return &typed
+			}
+		case bool:
+			result := strings.ToLower(val) == "true" || val == "1"
+			if typed, ok := any(result).(T); ok && val != "" {
+				return &typed
+			}
+		case int:
+			i, err := strconv.Atoi(val)
+			if err != nil {
+				break
+			}
+			if typed, ok := any(i).(T); ok && val != "" {
+				return &typed
+			}
+		default:
+			break
 		}
-	}
-	if fileCfg != nil {
-		return fileCfg
-	}
-	return fallback
-}
-
-func populateKeyBool(fileCfg *bool, envKey string, fallback *bool) *bool {
-	val, ok := os.LookupEnv(envKey)
-	if ok && val != "" {
-		var result = strings.ToLower(val) == "true" || val == "1"
-		return &result
 	}
 	if fileCfg != nil {
 		return fileCfg
