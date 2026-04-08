@@ -59,10 +59,10 @@ table {
 
     td,
     th {
-        text-align: left;
+        text-align: right;
 
-        &.dlcount {
-            text-align: right;
+        &.link {
+            text-align: left;
         }
 
         &.na.na {
