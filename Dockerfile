@@ -15,6 +15,8 @@ RUN mkdir staging && npm run build
 
 WORKDIR /usr/src/static/staging
 
+COPY ./static/ ./static/
+
 RUN mkdir http data && chown 1000:1000 data
 
 FROM ${BASE_IMG}:${BASE_IMG_TAG} AS builder
