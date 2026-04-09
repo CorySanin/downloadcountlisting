@@ -130,10 +130,20 @@ func (store *Storage) getTotalsRecentByPath(path string, date time.Time) (*sql.R
 func New(path string) Storage {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalf("Failed to open DB %s: %v", path, err)
 	}
 
+	db.SetMaxOpenConns(1)
+
 	applyMigrations(db)
+
+	if _, err := db.Exec(`
+	PRAGMA journal_mode=WAL;
+	PRAGMA synchronous=normal;
+	PRAGMA temp_store = FILE;
+	`); err != nil {
+		log.Fatalf("Failed to initialize PRAGMA: %v", err)
+	}
 
 	return Storage{
 		db: db,

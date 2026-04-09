@@ -144,3 +144,5 @@ dist
 config.yml
 root/
 *.db
+*.db-shm
+*.db-wal
