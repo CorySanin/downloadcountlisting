@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/CorySanin/downloadcountlisting/internal/config"
@@ -57,10 +58,11 @@ var templateFS embed.FS
 var conf config.Conf
 var templates *template.Template
 var store storage.Storage
+var wg sync.WaitGroup
 
-func InitWeb(cfg config.Conf, st storage.Storage) {
-	conf = cfg
-	store = st
+func InitWeb(cfg *config.Conf, st *storage.Storage, waitGroup *sync.WaitGroup) {
+	conf = *cfg
+	store = *st
 	mytemplates := []string{"layout.html"}
 	for i, v := range mytemplates {
 		mytemplates[i] = filepath.Join("templates", v)
@@ -70,6 +72,7 @@ func InitWeb(cfg config.Conf, st storage.Storage) {
 		log.Fatal(err)
 	}
 	templates = tmpl
+	wg = *waitGroup
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -219,6 +222,8 @@ func getMimeType(f string) (string, error) {
 
 func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, error) {
 	ch := make(chan map[string]storage.Totals)
+	wg.Add(1)
+	defer wg.Done()
 	go store.GetTotalsByPath(path, ch)
 	entires, err := os.ReadDir(path)
 	if err != nil {
@@ -273,6 +278,8 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, 
 		}
 	}
 	cleanup := make(chan int)
+	wg.Add(1)
+	defer wg.Done()
 	go cleanUpRemovedFiles(path, childFiles, totalsMap, cleanup)
 	return childDirs, childFiles, cleanup, nil
 }

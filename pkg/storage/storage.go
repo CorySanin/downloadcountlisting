@@ -127,6 +127,19 @@ func (store *Storage) getTotalsRecentByPath(path string, date time.Time) (*sql.R
 	return result, nil
 }
 
+func (store *Storage) Optimize() error {
+	log.Printf("Running DB optimize procedure...")
+	if _, err := store.db.Exec(`
+	PRAGMA analysis_limit=400;
+	PRAGMA optimize;
+	`); err != nil {
+		log.Printf("Failed to exec DB optimization command: %v", err)
+		return err
+	}
+	log.Printf("Done.")
+	return nil
+}
+
 func New(path string) Storage {
 	db, err := sql.Open("sqlite3", path)
 	if err != nil {
