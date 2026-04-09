@@ -57,7 +57,7 @@ func (store *Storage) RemoveDownloads(dls []DownloadIndex) error {
 }
 
 func (store *Storage) IncrementDownload(params Download) {
-	if _, err := store.db.Exec("INSERT INTO downloads (Path,Filename,Timestamp) VALUES (?, ?, ?)", params.Path, params.Filename, time.Now()); err != nil {
+	if _, err := store.db.Exec("INSERT INTO downloads (Path,Filename,AccessDomain,UserAgent,Timestamp) VALUES (?, ?, ?, ?, ?)", params.Path, params.Filename, params.AccessDomain, params.UserAgent, time.Now()); err != nil {
 		log.Printf("Failed to insert download: %v", err)
 	}
 }
@@ -80,6 +80,7 @@ func (store *Storage) getTotalsByPath(path string) (map[string]Totals, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer t.Close()
 	for t.Next() {
 		var filename string
 		var count int
@@ -95,6 +96,7 @@ func (store *Storage) getTotalsByPath(path string) (map[string]Totals, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer t.Close()
 	for t.Next() {
 		var filename string
 		var count int
