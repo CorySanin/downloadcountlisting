@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -12,21 +13,22 @@ import (
 )
 
 type Conf struct {
-	Port          *int    `yaml:"port"`
-	Title         *string `yaml:"title"`
-	Storage       *string `yaml:"storage"`
-	Directory     *string `yaml:"directory"`
-	Styles        *string `yaml:"styles"`
-	Icons         *bool   `yaml:"icons"`
-	HideDownloads *bool   `yaml:"hideDownloads"`
-	HideDotfiles  *bool   `yaml:"hideDotfiles"`
-	HideSymlinks  *bool   `yaml:"hideSymlinks"`
-	Heading       *string `yaml:"heading"`
-	Footer        *string `yaml:"footer"`
+	Port          *int             `yaml:"port"`
+	Title         *string          `yaml:"title"`
+	Storage       *string          `yaml:"storage"`
+	Directory     *string          `yaml:"directory"`
+	Styles        *string          `yaml:"styles"`
+	Icons         *bool            `yaml:"icons"`
+	HideDownloads *bool            `yaml:"hideDownloads"`
+	HideDotfiles  *bool            `yaml:"hideDotfiles"`
+	HideSymlinks  *bool            `yaml:"hideSymlinks"`
+	Heading       *string          `yaml:"heading"`
+	Footer        *string          `yaml:"footer"`
+	Ignore        []*regexp.Regexp `yaml:"ignore"`
 	directory     string
 }
 
-type expectedType interface {
+type expectedPrimitive interface {
 	bool | int | string
 }
 
@@ -43,17 +45,18 @@ func Config() Conf {
 		log.Print(err)
 	}
 	return Conf{
-		Title:         populateKey(cfg.Title, "TITLE", new(string("Index of "))),
-		Storage:       populateKey(cfg.Storage, "STORAGE", new(string(filepath.Join("data", "downloadcount.db")))),
-		Port:          populateKey(cfg.Port, "PORT", new(int(8080))),
-		Directory:     NormalizePath(*populateKey(cfg.Directory, "DIRECTORY", new(string("/srv/http/")))),
-		Icons:         populateKey(cfg.Icons, "ICONS", new(bool(true))),
-		HideDownloads: populateKey(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
-		HideDotfiles:  populateKey(cfg.HideDotfiles, "HIDEDOTFILES", new(bool(true))),
-		HideSymlinks:  populateKey(cfg.HideSymlinks, "HIDESYMLINKS", new(bool(false))),
-		Styles:        populateKey(cfg.Styles, "STYLES", new(string("styles.css"))),
-		Heading:       populateKey(cfg.Heading, "HEADING", new(string("<h1>Index of <span id=\"path\">%path%</span></h1>"))),
-		Footer:        populateKey(cfg.Footer, "FOOTER", new(string(""))),
+		Title:         populatePrimitive(cfg.Title, "TITLE", new(string("Index of "))),
+		Storage:       populatePrimitive(cfg.Storage, "STORAGE", new(string(filepath.Join("data", "downloadcount.db")))),
+		Port:          populatePrimitive(cfg.Port, "PORT", new(int(8080))),
+		Directory:     NormalizePath(*populatePrimitive(cfg.Directory, "DIRECTORY", new(string("/srv/http/")))),
+		Icons:         populatePrimitive(cfg.Icons, "ICONS", new(bool(true))),
+		HideDownloads: populatePrimitive(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
+		HideDotfiles:  populatePrimitive(cfg.HideDotfiles, "HIDEDOTFILES", new(bool(true))),
+		HideSymlinks:  populatePrimitive(cfg.HideSymlinks, "HIDESYMLINKS", new(bool(false))),
+		Styles:        populatePrimitive(cfg.Styles, "STYLES", new(string("styles.css"))),
+		Heading:       populatePrimitive(cfg.Heading, "HEADING", new(string("<h1>Index of <span id=\"path\">%path%</span></h1>"))),
+		Footer:        populatePrimitive(cfg.Footer, "FOOTER", new(string(""))),
+		Ignore:        cfg.Ignore,
 	}
 }
 
@@ -75,7 +78,7 @@ func envOrDefault(key string, fallback string) string {
 	return fallback
 }
 
-func populateKey[T expectedType](fileCfg *T, envKey string, fallback *T) *T {
+func populatePrimitive[T expectedPrimitive](fileCfg *T, envKey string, fallback *T) *T {
 	val, ok := os.LookupEnv(envKey)
 	if ok {
 		switch any(*fallback).(type) {

@@ -87,7 +87,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("User tried accessing %s but was denied.", destination)
 		return
 	}
-	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), r.URL.Path != "/"); err == nil {
+	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), r.URL.Path); err == nil {
 		defer func() {
 			<-ch
 		}()
@@ -194,7 +194,7 @@ func ApiHandler(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), *rpath != "/"); err == nil {
+	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), *rpath); err == nil {
 		defer func() {
 			<-ch
 		}()
@@ -221,7 +221,7 @@ func getMimeType(f string) (string, error) {
 	return mime.TypeByExtension(ext), nil
 }
 
-func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, error) {
+func getChildren(path string, reqpath string) ([]string, []FileEntry, chan int, error) {
 	ch := make(chan map[string]storage.Totals)
 	wg.Add(1)
 	defer wg.Done()
@@ -242,7 +242,15 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, 
 			return err != nil || l != checkPath
 		})
 	}
+	if conf.Ignore != nil {
+		for _, r := range conf.Ignore {
+			entires = slices.DeleteFunc(entires, func(ent os.DirEntry) bool {
+				return r.Match([]byte(filepath.Join(reqpath, ent.Name())))
+			})
+		}
+	}
 	dirCount := 0
+	hasParent := reqpath != "/"
 	if hasParent {
 		dirCount = 1
 	}
