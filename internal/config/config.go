@@ -20,6 +20,7 @@ type Conf struct {
 	Icons         *bool   `yaml:"icons"`
 	HideDownloads *bool   `yaml:"hideDownloads"`
 	HideDotfiles  *bool   `yaml:"hideDotfiles"`
+	HideSymlinks  *bool   `yaml:"hideSymlinks"`
 	Heading       *string `yaml:"heading"`
 	Footer        *string `yaml:"footer"`
 	directory     string
@@ -49,6 +50,7 @@ func Config() Conf {
 		Icons:         populateKey(cfg.Icons, "ICONS", new(bool(true))),
 		HideDownloads: populateKey(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
 		HideDotfiles:  populateKey(cfg.HideDotfiles, "HIDEDOTFILES", new(bool(true))),
+		HideSymlinks:  populateKey(cfg.HideSymlinks, "HIDESYMLINKS", new(bool(false))),
 		Styles:        populateKey(cfg.Styles, "STYLES", new(string("styles.css"))),
 		Heading:       populateKey(cfg.Heading, "HEADING", new(string("<h1>Index of <span id=\"path\">%path%</span></h1>"))),
 		Footer:        populateKey(cfg.Footer, "FOOTER", new(string(""))),

@@ -235,13 +235,20 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, 
 			return len(ent.Name()) > 0 && filepath.Base(ent.Name())[0] == '.'
 		})
 	}
+	if *conf.HideSymlinks {
+		entires = slices.DeleteFunc(entires, func(ent os.DirEntry) bool {
+			checkPath := filepath.Join(path, ent.Name())
+			l, err := filepath.EvalSymlinks(checkPath)
+			return err != nil || l != checkPath
+		})
+	}
 	dirCount := 0
 	if hasParent {
 		dirCount = 1
 	}
 	fileCount := 0
 	for _, v := range entires {
-		if v.IsDir() || isSymlinkDir(path, v) {
+		if v.IsDir() || (!*conf.HideSymlinks && isSymlinkDir(path, v)) {
 			dirCount++
 		} else {
 			fileCount++
@@ -260,7 +267,7 @@ func getChildren(path string, hasParent bool) ([]string, []FileEntry, chan int, 
 	}
 
 	for _, v := range entires {
-		if v.IsDir() || isSymlinkDir(path, v) {
+		if v.IsDir() || (!*conf.HideSymlinks && isSymlinkDir(path, v)) {
 			childDirs[dirCount] = v.Name()
 			dirCount++
 		} else {
