@@ -3,10 +3,8 @@ package web
 import (
 	"embed"
 	"encoding/json"
-	"fmt"
 	"html/template"
 	"log"
-	"maps"
 	"mime"
 	"net/http"
 	"os"
@@ -52,42 +50,48 @@ type (
 		Heading       template.HTML
 		Footer        template.HTML
 	}
+
+	Server struct {
+		conf      *config.Conf
+		store     *storage.Storage
+		wg        *sync.WaitGroup
+		templates *template.Template
+	}
 )
 
 //go:embed templates/*
 var templateFS embed.FS
-var conf config.Conf
-var templates *template.Template
-var store storage.Storage
-var wg sync.WaitGroup
 
-func InitWeb(cfg *config.Conf, st *storage.Storage, waitGroup *sync.WaitGroup) {
-	conf = *cfg
-	store = *st
+func NewServer(cfg *config.Conf, st *storage.Storage, waitGroup *sync.WaitGroup) *Server {
 	mytemplates := []string{"layout.html"}
 	for i, v := range mytemplates {
 		mytemplates[i] = filepath.Join("templates", v)
 	}
 	tmpl, err := template.ParseFS(templateFS, mytemplates...)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to parse templates: %v", err)
 	}
-	templates = tmpl
-	wg = *waitGroup
+
+	return &Server{
+		conf:      cfg,
+		store:     st,
+		wg:        waitGroup,
+		templates: tmpl,
+	}
 }
 
-func Handler(w http.ResponseWriter, r *http.Request) {
-	cDir, err := conf.GetDirectory()
+func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
+	cDir, err := s.conf.GetDirectory()
 	if err != nil {
 		log.Fatalf("Get directory failed: %v", err)
 	}
 	destination := filepath.Join(cDir, r.URL.Path[1:])
-	if !strings.HasPrefix(destination+config.SeparatorString, cDir) {
-		http.Error(w, "Something went wrong", http.StatusBadRequest)
+	if !strings.HasPrefix(filepath.Clean(destination)+config.SeparatorString, cDir) {
+		http.Error(w, "Bad request", http.StatusBadRequest)
 		log.Printf("User tried accessing %s but was denied.", destination)
 		return
 	}
-	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), r.URL.Path); err == nil {
+	if childDirs, childFiles, ch, err := s.getChildren(*config.NormalizePath(destination), r.URL.Path); err == nil {
 		defer func() {
 			<-ch
 		}()
@@ -98,16 +102,16 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 				Subdirectories: childDirs,
 				Files:          childFiles,
 			},
-			Title:         *conf.Title,
-			Icons:         *conf.Icons,
-			HideDownloads: *conf.HideDownloads,
-			Styles:        conf.Styles,
-			Heading:       template.HTML(strings.ReplaceAll(*conf.Heading, "%path%", template.HTMLEscapeString(normalizedDirname))),
-			Footer:        template.HTML(strings.ReplaceAll(*conf.Footer, "%path%", template.HTMLEscapeString(normalizedDirname))),
+			Title:         *s.conf.Title,
+			Icons:         *s.conf.Icons,
+			HideDownloads: *s.conf.HideDownloads,
+			Styles:        s.conf.Styles,
+			Heading:       template.HTML(strings.ReplaceAll(*s.conf.Heading, "%path%", template.HTMLEscapeString(normalizedDirname))),
+			Footer:        template.HTML(strings.ReplaceAll(*s.conf.Footer, "%path%", template.HTMLEscapeString(normalizedDirname))),
 		}
-		if err := templates.ExecuteTemplate(w, "layout.html", data); err != nil {
+		if err := s.templates.ExecuteTemplate(w, "layout.html", data); err != nil {
 			http.Error(w, "Something went wrong", http.StatusInternalServerError)
-			log.Default().Print(err.Error())
+			log.Printf("Template execution error: %v", err)
 		}
 		return
 	} else if file, err := os.Open(destination); err == nil {
@@ -118,8 +122,9 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "Internal server error.", 500)
 			return
 		}
-		mt, err := getMimeType(fileName)
-		if err != nil {
+
+		mt := mime.TypeByExtension(filepath.Ext(fileName))
+		if mt == "" {
 			mt = "application/octet-stream"
 		}
 		w.Header().Set("Content-Type", mt)
@@ -129,7 +134,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		rec := &responseWriterWithStatus{ResponseWriter: w}
 		http.ServeContent(rec, r, fileName, fileStat.ModTime(), file)
 		if rec.success() {
-			store.IncrementDownload(storage.Download{
+			s.store.IncrementDownload(storage.Download{
 				DownloadIndex: storage.DownloadIndex{
 					Path:     fp,
 					Filename: fileName,
@@ -140,46 +145,46 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	} else if filepath.Base(destination) == "favicon.ico" {
-		if file, err := os.Open(filepath.Join("static", "images", filepath.Base(destination))); err == nil {
+		if file, err := os.Open(filepath.Join("static", "images", "favicon.ico")); err == nil {
 			defer file.Close()
-			_, fileName := filepath.Split(destination)
 			fileStat, err := file.Stat()
 			if err != nil {
 				http.Error(w, "Internal server error.", 500)
 				return
 			}
-			mt, err := getMimeType(fileName)
-			if err != nil {
-				mt = "application/octet-stream"
-			}
-			w.Header().Set("Content-Type", mt)
-			w.Header().Set("Content-Disposition", "filename="+fileName)
+			w.Header().Set("Content-Type", mime.TypeByExtension(filepath.Ext(destination)))
 			w.Header().Set("Content-Length", strconv.FormatInt(fileStat.Size(), 10))
-
-			http.ServeContent(w, r, fileName, fileStat.ModTime(), file)
+			http.ServeContent(w, r, "favicon.ico", fileStat.ModTime(), file)
 			return
 		}
 	}
 	http.Error(w, "404 file not found", 404)
 }
 
-func ApiHandler(w http.ResponseWriter, r *http.Request) {
+func (s *Server) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	version := r.Header.Get("X-API-Version")
-	if version != "1" {
+	if r.Header.Get("X-API-Version") != "1" {
 		w.WriteHeader(http.StatusPreconditionFailed)
 		json.NewEncoder(w).Encode(ApiErrorResponse{
 			Error: new(string("unexpected API version")),
 		})
 		return
 	}
-	cDir, err := conf.GetDirectory()
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		json.NewEncoder(w).Encode(ApiErrorResponse{
+			Error: new(string("request method must be GET")),
+		})
+		return
+	}
+
+	cDir, err := s.conf.GetDirectory()
 	if err != nil {
 		log.Fatalf("Get directory failed: %v", err)
 	}
 	rpath := config.NormalizePath(r.URL.Path[len("/.api/"):])
 	destination := filepath.Join(cDir, *rpath)
-	if !strings.HasPrefix(destination+config.SeparatorString, cDir) {
+	if !strings.HasPrefix(filepath.Clean(destination)+config.SeparatorString, cDir) {
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(ApiErrorResponse{
 			Error: new(string("bad request")),
@@ -187,19 +192,12 @@ func ApiHandler(w http.ResponseWriter, r *http.Request) {
 		log.Printf("User tried accessing %s via API but was denied.", destination)
 		return
 	}
-	if r.Method != "GET" {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ApiErrorResponse{
-			Error: new(string("request method must be GET")),
-		})
-		return
-	}
-	if childDirs, childFiles, ch, err := getChildren(*config.NormalizePath(destination), *rpath); err == nil {
+	if childDirs, childFiles, ch, err := s.getChildren(destination, *rpath); err == nil {
 		defer func() {
 			<-ch
 		}()
 		var data = ApiListingData{
-			Path:           *config.NormalizePath(*rpath),
+			Path:           *rpath,
 			Subdirectories: childDirs,
 			Files:          childFiles,
 		}
@@ -212,72 +210,68 @@ func ApiHandler(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func getMimeType(f string) (string, error) {
-	lastDot := strings.LastIndex(f, ".")
-	if lastDot < 0 {
-		return "", fmt.Errorf("No dot character in %s", f)
-	}
-	ext := f[lastDot:]
-	return mime.TypeByExtension(ext), nil
-}
+func (s *Server) getChildren(path string, reqpath string) ([]string, []FileEntry, chan int, error) {
+	ch := make(chan map[string]storage.Totals, 1)
+	s.wg.Go(func() {
+		s.store.GetTotalsByPath(path, ch)
+	})
 
-func getChildren(path string, reqpath string) ([]string, []FileEntry, chan int, error) {
-	ch := make(chan map[string]storage.Totals)
-	wg.Add(1)
-	defer wg.Done()
-	go store.GetTotalsByPath(path, ch)
-	entires, err := os.ReadDir(path)
+	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, nil, nil, err
 	}
-	if *conf.HideDotfiles {
-		entires = slices.DeleteFunc(entires, func(ent os.DirEntry) bool {
-			return len(ent.Name()) > 0 && filepath.Base(ent.Name())[0] == '.'
+
+	if *s.conf.HideDotfiles {
+		entries = slices.DeleteFunc(entries, func(ent os.DirEntry) bool {
+			return len(ent.Name()) > 0 && ent.Name()[0] == '.'
 		})
 	}
-	if *conf.HideSymlinks {
-		entires = slices.DeleteFunc(entires, func(ent os.DirEntry) bool {
-			checkPath := filepath.Join(path, ent.Name())
-			l, err := filepath.EvalSymlinks(checkPath)
-			return err != nil || l != checkPath
+
+	if *s.conf.HideSymlinks {
+		entries = slices.DeleteFunc(entries, func(ent os.DirEntry) bool {
+			info, err := ent.Info()
+			if err != nil {
+				return true
+			}
+			return info.Mode()&os.ModeSymlink != 0
 		})
 	}
-	if conf.Ignore != nil {
-		for _, r := range conf.Ignore {
-			entires = slices.DeleteFunc(entires, func(ent os.DirEntry) bool {
-				return r.Match([]byte(filepath.Join(reqpath, ent.Name())))
+
+	if s.conf.Ignore != nil {
+		for _, r := range s.conf.Ignore {
+			entries = slices.DeleteFunc(entries, func(ent os.DirEntry) bool {
+				return r.MatchString(filepath.Join(reqpath, ent.Name()))
 			})
 		}
 	}
+
 	dirCount := 0
-	hasParent := reqpath != "/"
+	fileCount := 0
+	hasParent := reqpath != "/" && reqpath != ""
 	if hasParent {
 		dirCount = 1
 	}
-	fileCount := 0
-	for _, v := range entires {
-		if v.IsDir() || (!*conf.HideSymlinks && isSymlinkDir(path, v)) {
+
+	for _, v := range entries {
+		if isDir(path, v) {
 			dirCount++
 		} else {
 			fileCount++
 		}
 	}
 
-	childDirs := make([]string, dirCount)
-	childFiles := make([]FileEntry, fileCount)
-	dirCount = 0
-	fileCount = 0
-	totalsMap := <-ch
+	childDirs := make([]string, 0, dirCount)
+	childFiles := make([]FileEntry, 0, fileCount)
 
 	if hasParent {
-		childDirs[dirCount] = ".."
-		dirCount++
+		childDirs = append(childDirs, "..")
 	}
 
-	for _, v := range entires {
-		if v.IsDir() || (!*conf.HideSymlinks && isSymlinkDir(path, v)) {
-			childDirs[dirCount] = v.Name()
-			dirCount++
+	totalsMap := <-ch
+
+	for _, v := range entries {
+		if isDir(path, v) {
+			childDirs = append(childDirs, v.Name())
 		} else {
 			var fEntry = FileEntry{
 				Filename: v.Name(),
@@ -288,37 +282,48 @@ func getChildren(path string, reqpath string) ([]string, []FileEntry, chan int, 
 				fEntry.Date = modtime.Format(time.DateOnly)
 				fEntry.Time = modtime.Format("15:04:05 -0700")
 			}
-			if !*conf.HideDownloads && totalsMap != nil {
+			if !*s.conf.HideDownloads && totalsMap != nil {
 				if t, ok := totalsMap[v.Name()]; ok {
 					fEntry.DL = t.Recent
 					fEntry.DLTotal = t.All
 				}
 			}
-			childFiles[fileCount] = fEntry
-			fileCount++
+			childFiles = append(childFiles, fEntry)
 		}
 	}
-	cleanup := make(chan int)
-	wg.Add(1)
-	defer wg.Done()
-	go cleanUpRemovedFiles(path, childFiles, totalsMap, cleanup)
+
+	cleanup := make(chan int, 1)
+	s.wg.Go(func() {
+		s.cleanUpRemovedFiles(path, childFiles, totalsMap, cleanup)
+	})
+
 	return childDirs, childFiles, cleanup, nil
 }
 
-func isSymlinkDir(path string, v os.DirEntry) bool {
-	if l, err := filepath.EvalSymlinks(filepath.Join(path, v.Name())); err == nil {
-		_, err := os.ReadDir(l)
-		return err == nil
+func isDir(path string, v os.DirEntry) bool {
+	if v.IsDir() {
+		return true
 	}
-	return false
+	info, err := os.Stat(filepath.Join(path, v.Name()))
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
 
-func cleanUpRemovedFiles(p string, childFiles []FileEntry, totals map[string]storage.Totals, ch chan int) {
-	for _, v := range childFiles {
-		maps.DeleteFunc(totals, func(key string, value storage.Totals) bool {
-			return v.Filename == key
-		})
+func (s *Server) cleanUpRemovedFiles(p string, childFiles []FileEntry, totals map[string]storage.Totals, ch chan int) {
+	if len(totals) == 0 {
+		ch <- 0
+		return
 	}
+	for _, v := range childFiles {
+		delete(totals, v.Filename)
+	}
+	if len(totals) == 0 {
+		ch <- 0
+		return
+	}
+
 	dls := make([]storage.DownloadIndex, 0, len(totals))
 	for k := range totals {
 		log.Printf("No longer exists: %s", filepath.Join(p, k))
@@ -327,13 +332,11 @@ func cleanUpRemovedFiles(p string, childFiles []FileEntry, totals map[string]sto
 			Filename: k,
 		})
 	}
-	if err := store.RemoveDownloads(dls); err != nil {
+	if err := s.store.RemoveDownloads(dls); err != nil {
 		log.Printf("Failed removing %d rows: %v", len(dls), err)
 		ch <- -1
 		return
 	}
-	if len(dls) > 0 {
-		log.Printf("Removed %d rows", len(dls))
-	}
+	log.Printf("Removed %d rows", len(dls))
 	ch <- len(dls)
 }

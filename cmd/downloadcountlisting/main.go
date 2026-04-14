@@ -18,6 +18,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -27,36 +28,54 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/CorySanin/downloadcountlisting/internal/config"
 	"github.com/CorySanin/downloadcountlisting/internal/web"
 	"github.com/CorySanin/downloadcountlisting/pkg/storage"
 )
 
-var wg sync.WaitGroup
-
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	conf := config.Config()
-	os.MkdirAll(filepath.Dir(*conf.Storage), 0755)
+	if err := os.MkdirAll(filepath.Dir(*conf.Storage), 0755); err != nil {
+		log.Fatalf("failed to create storage directory: %v", err)
+	}
 	store := storage.New(*conf.Storage)
-	web.InitWeb(&conf, &store, &wg)
-	server := http.Server{
-		Addr: fmt.Sprintf(":%d", *conf.Port),
+	var wg sync.WaitGroup
+
+	server := web.NewServer(&conf, &store, &wg)
+
+	mux := http.NewServeMux()
+	mux.Handle("/.static/", http.StripPrefix("/.static", notFoundOnDir(http.FileServer(http.Dir("./static")))))
+	mux.HandleFunc("/.api/", server.ApiHandler)
+	mux.HandleFunc("/", server.Handler)
+
+	httpServer := &http.Server{
+		Addr:    fmt.Sprintf(":%d", *conf.Port),
+		Handler: mux,
 	}
-	http.Handle("/.static/", http.StripPrefix("/.static", notFoundOnDir(http.FileServer(http.Dir("./static")))))
-	http.HandleFunc("/.api/", web.ApiHandler)
-	http.HandleFunc("/", web.Handler)
-	fmt.Printf("Listening on port %d", *conf.Port)
-	go server.ListenAndServe()
+
+	go func() {
+		fmt.Printf("Listening on port %d\n", *conf.Port)
+		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
 	<-ctx.Done()
-	if err := server.Shutdown(context.Background()); err != nil {
-		log.Fatalf("could not shutdown server: %v", err)
+	fmt.Println("\nShutting down server...")
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
+	defer cancel()
+
+	if err := httpServer.Shutdown(shutdownCtx); err != nil {
+		log.Fatalf("Server forced to shutdown: %v", err)
 	}
+
 	wg.Wait()
 	store.Optimize()
-	os.Exit(0)
 }
 
 func notFoundOnDir(next http.Handler) http.Handler {
