@@ -2,7 +2,6 @@ package web
 
 import (
 	"embed"
-	"encoding/json"
 	"html/template"
 	"log"
 	"mime"
@@ -159,55 +158,6 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	http.Error(w, "404 file not found", 404)
-}
-
-func (s *Server) ApiHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	if r.Header.Get("X-API-Version") != "1" {
-		w.WriteHeader(http.StatusPreconditionFailed)
-		json.NewEncoder(w).Encode(ApiErrorResponse{
-			Error: new(string("unexpected API version")),
-		})
-		return
-	}
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		json.NewEncoder(w).Encode(ApiErrorResponse{
-			Error: new(string("request method must be GET")),
-		})
-		return
-	}
-
-	cDir, err := s.conf.GetDirectory()
-	if err != nil {
-		log.Fatalf("Get directory failed: %v", err)
-	}
-	rpath := config.NormalizePath(r.URL.Path[len("/.api/"):])
-	destination := filepath.Join(cDir, *rpath)
-	if !strings.HasPrefix(filepath.Clean(destination)+config.SeparatorString, cDir) {
-		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(ApiErrorResponse{
-			Error: new(string("bad request")),
-		})
-		log.Printf("User tried accessing %s via API but was denied.", destination)
-		return
-	}
-	if childDirs, childFiles, ch, err := s.getChildren(destination, *rpath); err == nil {
-		defer func() {
-			<-ch
-		}()
-		var data = ApiListingData{
-			Path:           *rpath,
-			Subdirectories: childDirs,
-			Files:          childFiles,
-		}
-		json.NewEncoder(w).Encode(data)
-		return
-	}
-	w.WriteHeader(http.StatusNotFound)
-	json.NewEncoder(w).Encode(ApiErrorResponse{
-		Error: new(string("not found")),
-	})
 }
 
 func (s *Server) getChildren(path string, reqpath string) ([]string, []FileEntry, chan int, error) {

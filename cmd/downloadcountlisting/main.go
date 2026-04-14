@@ -49,7 +49,7 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.Handle("/.static/", http.StripPrefix("/.static", notFoundOnDir(http.FileServer(http.Dir("./static")))))
-	mux.HandleFunc("/.api/", server.ApiHandler)
+	mux.HandleFunc(web.ApiPath, server.ApiHandler)
 	mux.HandleFunc("/", server.Handler)
 
 	httpServer := &http.Server{
