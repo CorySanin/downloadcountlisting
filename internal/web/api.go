@@ -146,7 +146,7 @@ func (s *Server) apiZipHandler(w http.ResponseWriter, r *http.Request, _ string)
 	}
 	rec := &responseWriterWithStatus{ResponseWriter: w}
 	rec.Header().Set("Content-Type", "application/octet-stream")
-	rec.Header().Set("Content-Disposition", fmt.Sprintf("filename=%s.zip", filepath.Base(*rpath)))
+	rec.Header().Set("Content-Disposition", fmt.Sprintf("filename=%s", zipFilename(destination)))
 	zipw := zip.NewWriter(rec)
 	defer zipw.Close()
 	for _, v := range body.Files {
@@ -169,6 +169,14 @@ func (s *Server) apiZipHandler(w http.ResponseWriter, r *http.Request, _ string)
 			UserAgent:    r.UserAgent(),
 		})
 	}
+}
+
+func zipFilename(rpath string) string {
+	name := filepath.Base(rpath)
+	if name == "/" {
+		name = "root"
+	}
+	return fmt.Sprintf("%s.zip", name)
 }
 
 func zipFile(zw *zip.Writer, fname string) error {
