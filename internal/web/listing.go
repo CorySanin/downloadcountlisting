@@ -115,11 +115,11 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 		if mt == "" {
 			mt = "application/octet-stream"
 		}
-		w.Header().Set("Content-Type", mt)
-		w.Header().Set("Content-Disposition", "filename="+fileName)
-		w.Header().Set("Content-Length", strconv.FormatInt(fileStat.Size(), 10))
-
 		rec := &responseWriterWithStatus{ResponseWriter: w}
+		rec.Header().Set("Content-Type", mt)
+		rec.Header().Set("Content-Disposition", "filename="+fileName)
+		rec.Header().Set("Content-Length", strconv.FormatInt(fileStat.Size(), 10))
+
 		http.ServeContent(rec, r, fileName, fileStat.ModTime(), file)
 		if rec.success() {
 			s.store.IncrementDownload(storage.Download{
