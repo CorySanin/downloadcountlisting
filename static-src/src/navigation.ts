@@ -13,6 +13,7 @@ interface DirApiResponse {
     subdirectories: string[];
     files: FileEntry[];
     titlePrefix: string;
+    dl: boolean;
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -28,7 +29,7 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     }
 
-    function createDirRow(dirName: string): HTMLAnchorElement {
+    function createDirRow(dirName: string, dl: boolean): HTMLAnchorElement {
         const naCol = '-';
         const tbody = getTBody();
         const tr = document.createElement('tr');
@@ -36,42 +37,42 @@ document.addEventListener("DOMContentLoaded", function () {
         const tdLink = document.createElement('td');
         const tdSize = document.createElement('td');
         const tdDate = document.createElement('td');
-        const tdDl = document.createElement('td');
-        const tddlTotal = document.createElement('td');
-        [tdLink, tdSize, tdDate, tdDl, tddlTotal].forEach(td => tr.appendChild(td));
+
+        [tdLink, tdSize, tdDate].forEach(td => tr.appendChild(td));
         tdLink.classList.add('link', 'directory');
         tdSize.classList.add('na', 'size');
         tdDate.classList.add('na', 'date');
-        tdDl.classList.add('na', 'dlcount', 'dlRecent');
-        tddlTotal.classList.add('na', 'dlcount', 'dlTotal');
         const anchor = document.createElement('a');
         anchor.appendChild(document.createTextNode(anchor.href = `${dirName}/`));
         anchor.title = dirName;
         tdLink.appendChild(anchor);
         tdSize.appendChild(document.createTextNode(naCol));
         tdDate.appendChild(document.createTextNode(naCol));
-        tdDl.appendChild(document.createTextNode(naCol));
-        tddlTotal.appendChild(document.createTextNode(naCol));
+        if (dl) {
+            const tdDl = document.createElement('td');
+            const tddlTotal = document.createElement('td');
+            [tdDl, tddlTotal].forEach(td => tr.appendChild(td));
+            tdDl.classList.add('na', 'dlcount', 'dlRecent');
+            tddlTotal.classList.add('na', 'dlcount', 'dlTotal');
+            tdDl.appendChild(document.createTextNode(naCol));
+            tddlTotal.appendChild(document.createTextNode(naCol));
+        }
         return anchor;
     }
 
-    function createFileRow(fileEntry: FileEntry) {
+    function createFileRow(fileEntry: FileEntry, dl: boolean) {
         const tbody = getTBody();
         const tr = document.createElement('tr');
         tbody?.appendChild(tr);
         const tdLink = document.createElement('td');
         const tdSize = document.createElement('td');
         const tdDate = document.createElement('td');
-        const tdDl = document.createElement('td');
-        const tddlTotal = document.createElement('td');
         const timeSpan = document.createElement('span');
-        [tdLink, tdSize, tdDate, tdDl, tddlTotal].forEach(td => tr.appendChild(td));
+        [tdLink, tdSize, tdDate].forEach(td => tr.appendChild(td));
         tdLink.classList.add('link');
         tdSize.classList.add('size');
         tdDate.classList.add('date');
-        tdDl.classList.add('dlcount', 'dlRecent');
         timeSpan.classList.add('time');
-        tddlTotal.classList.add('dlcount', 'dlTotal');
         const anchor = document.createElement('a');
         anchor.appendChild(document.createTextNode(anchor.href = `${fileEntry.filename}`));
         anchor.title = fileEntry.filename;
@@ -80,8 +81,15 @@ document.addEventListener("DOMContentLoaded", function () {
         tdDate.appendChild(document.createTextNode(`${fileEntry.date} `));
         tdDate.appendChild(timeSpan);
         timeSpan.appendChild(document.createTextNode(fileEntry.time));
-        tdDl.appendChild(document.createTextNode(`${fileEntry.dl}`));
-        tddlTotal.appendChild(document.createTextNode(`${fileEntry.dlTotal}`));
+        if (dl) {
+            const tdDl = document.createElement('td');
+            const tddlTotal = document.createElement('td');
+            [tdDl, tddlTotal].forEach(td => tr.appendChild(td));
+            tdDl.classList.add('dlcount', 'dlRecent');
+            tddlTotal.classList.add('dlcount', 'dlTotal');
+            tdDl.appendChild(document.createTextNode(`${fileEntry.dl}`));
+            tddlTotal.appendChild(document.createTextNode(`${fileEntry.dlTotal}`));
+        }
     }
 
     async function navigate(url: URL) {
@@ -96,8 +104,8 @@ document.addEventListener("DOMContentLoaded", function () {
                 throw new Error(`Response status: ${resp.status}`);
             }
             const respBody: DirApiResponse = await resp.json();
-            const anchors = respBody.subdirectories.map(createDirRow);
-            respBody.files.forEach(createFileRow);
+            const anchors = respBody.subdirectories.map(dir => createDirRow(dir, respBody.dl));
+            respBody.files.forEach(file => createFileRow(file, respBody.dl));
             document.querySelectorAll('span.pathname').forEach(pathContainer => {
                 clearChildren(pathContainer);
                 pathContainer.appendChild(document.createTextNode(respBody.path));

@@ -24,6 +24,7 @@ type (
 	ApiListingData struct {
 		ApiErrorResponse
 		TitlePrefix    string      `json:"titlePrefix"`
+		Downloads      bool        `json:"dl"`
 		Path           string      `json:"path"`
 		Subdirectories []string    `json:"subdirectories"`
 		Files          []FileEntry `json:"files"`
@@ -96,6 +97,7 @@ func (s *Server) apiDirHandler(w http.ResponseWriter, r *http.Request, _ string)
 			Subdirectories: childDirs,
 			Files:          childFiles,
 			TitlePrefix:    *s.conf.Title,
+			Downloads:      !*s.conf.HideDownloads,
 		}
 		json.NewEncoder(w).Encode(data)
 		return
