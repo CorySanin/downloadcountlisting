@@ -18,6 +18,11 @@ interface DirApiResponse {
 
 document.addEventListener("DOMContentLoaded", function () {
 
+    function setLoaderVisibility(visible: boolean) {
+        const loader = document.querySelector('.loader');
+        loader?.classList[visible ? 'remove' : 'add'].apply(loader.classList, ['display-none']);
+    }
+
     function getTBody() {
         return document.querySelector('table#list > tbody')
     }
@@ -31,7 +36,6 @@ document.addEventListener("DOMContentLoaded", function () {
         while (parent?.firstChild) {
             parent.removeChild(parent.lastChild!);
         }
-        setButtonState(false);
     }
 
     function createDirRow(dirName: string, dl: boolean): HTMLAnchorElement {
@@ -121,10 +125,14 @@ document.addEventListener("DOMContentLoaded", function () {
         catch {
             window.location.assign(url.toString());
         }
+        setLoaderVisibility(false);
+        setButtonState();
     }
 
     function loadUrl(url: URL) {
         window.scrollTo(0, 0);
+        setLoaderVisibility(true);
+        setButtonState(false);
         clearChildren();
         return navigate(url);
     }
@@ -163,15 +171,6 @@ document.addEventListener("DOMContentLoaded", function () {
                 td.appendChild(checkbox);
                 td.addEventListener('click', e => {
                     e.target === checkbox || (checkbox.checked = !checkbox.checked);
-                    setButtonState();
-                });
-                checkbox.addEventListener('change', _ => {
-                    if (checkbox.checked) {
-                        setButtonState(true);
-                    }
-                    else {
-                        setButtonState();
-                    }
                 });
             }
             tr.prepend(td);
@@ -184,10 +183,7 @@ document.addEventListener("DOMContentLoaded", function () {
             btn.disabled = !force;
             return;
         }
-        btn.disabled = true;
-        getAllCheckboxes().forEach(chkbx => {
-            (chkbx as HTMLInputElement).checked && (btn.disabled = false);
-        });
+        btn.disabled = getAllCheckboxes().length === 0;
     }
 
     window.addEventListener('popstate', event => {
@@ -207,16 +203,19 @@ document.addEventListener("DOMContentLoaded", function () {
         button.title = 'Download selected';
         th.appendChild(button);
         element.prepend(th);
-        button.disabled = true;
         return button;
     })(document.querySelector('table#list > thead > tr'));
 
     downloadButton.addEventListener('click', async _ => {
-        const files: string[] = [];
-        getAllCheckboxes().forEach(chkbx => {
-            (chkbx as HTMLInputElement).checked && files.push(decodeURIComponent((chkbx as HTMLInputElement).value));
-            (chkbx as HTMLInputElement).checked = false;
+        const checkedFiles: string[] = [];
+        const allFiles: string[] = [];
+        getAllCheckboxes().forEach(c => {
+            const chkbx = c as HTMLInputElement;
+            chkbx.checked && checkedFiles.push(decodeURIComponent(chkbx.value));
+            chkbx.checked = false;
+            checkedFiles.length > 0 || allFiles.push(chkbx.value);
         });
+        const files = checkedFiles.length > 0 ? checkedFiles : allFiles;
         setButtonState(false);
         const url = new URL(window.location.href);
         const resp = await fetch(`${url.protocol}//${url.host}/.api/zip`, {
@@ -226,7 +225,7 @@ document.addEventListener("DOMContentLoaded", function () {
             },
             body: JSON.stringify({
                 directory: decodeURIComponent(url.pathname),
-                files
+                files: files
             })
         });
         if (!resp.ok) {
@@ -242,6 +241,7 @@ document.addEventListener("DOMContentLoaded", function () {
         setTimeout(function () {
             document.body.removeChild(anchor);
             window.URL.revokeObjectURL(zip);
+            setButtonState();
         }, 0);
     });
 });

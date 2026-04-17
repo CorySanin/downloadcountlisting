@@ -32,6 +32,14 @@
     }
 }
 
+.loader {
+	background-color: var(--nav-background);
+
+	&::before {
+		background-color: var(--nav-border);
+	}
+}
+
 body {
     background-color: var(--background);
     color: var(--foreground);

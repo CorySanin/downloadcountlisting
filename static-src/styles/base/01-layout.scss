@@ -16,6 +16,10 @@ body {
 	box-sizing: border-box;
 }
 
+.display-none.display-none.display-none {
+	display: none;
+}
+
 .table-container {
 	max-width: 100%;
 	overflow-x: auto;
@@ -71,6 +75,48 @@ table {
 .footer {
 	margin-top: 1.25em;
 }
+
+body {
+	background-color: #000000;
+}
+
+.loader {
+	display: block;
+	position: fixed;
+	top: calc(50vh - 32px);
+	left: calc(50vw - 32px);
+	width: 64px;
+	height: 64px;
+	border-radius: 50%;
+	overflow: hidden;
+
+	&::before {
+		content: '';
+		position: absolute;
+		inset: 0px;
+		margin: auto;
+		animation: rightToLeft 2s linear infinite;
+	}
+}
+
+@keyframes rightToLeft {
+
+	0%,
+	10% {
+		transform: translateX(64px)
+	}
+
+	40%,
+	60% {
+		transform: translateX(0px)
+	}
+
+	90%,
+	100% {
+		transform: translateX(-64px)
+	}
+}
+
 
 @media screen and (max-width: 990px) {
 	.date .time {
