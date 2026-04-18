@@ -23,7 +23,6 @@ type (
 
 	ApiListingData struct {
 		ApiErrorResponse
-		TitlePrefix    string      `json:"titlePrefix"`
 		Downloads      bool        `json:"dl"`
 		Path           string      `json:"path"`
 		Subdirectories []string    `json:"subdirectories"`
@@ -54,7 +53,7 @@ func (s *Server) ApiHandler(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, apiDirPath) {
 		s.apiDirHandler(w, r, apiVer)
 		return
-	} else if r.URL.Path == apiZipPath {
+	} else if r.URL.Path == apiZipPath && *s.conf.EnableZipDownloads {
 		s.apiZipHandler(w, r, apiVer)
 		return
 	}
@@ -97,7 +96,6 @@ func (s *Server) apiDirHandler(w http.ResponseWriter, r *http.Request, _ string)
 			Path:           *rpath,
 			Subdirectories: childDirs,
 			Files:          childFiles,
-			TitlePrefix:    *s.conf.Title,
 			Downloads:      !*s.conf.HideDownloads,
 		}
 		json.NewEncoder(w).Encode(data)

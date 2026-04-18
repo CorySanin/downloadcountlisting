@@ -13,20 +13,21 @@ import (
 )
 
 type Conf struct {
-	Port          *int             `yaml:"port"`
-	Title         *string          `yaml:"title"`
-	Storage       *string          `yaml:"storage"`
-	Directory     *string          `yaml:"directory"`
-	Styles        *string          `yaml:"styles"`
-	Icons         *bool            `yaml:"icons"`
-	HideDownloads *bool            `yaml:"hideDownloads"`
-	HideDotfiles  *bool            `yaml:"hideDotfiles"`
-	HideSymlinks  *bool            `yaml:"hideSymlinks"`
-	EnableJS      *bool            `yaml:"enableJs"`
-	Heading       *string          `yaml:"heading"`
-	Footer        *string          `yaml:"footer"`
-	Ignore        []*regexp.Regexp `yaml:"ignore"`
-	directory     string
+	Port               *int             `yaml:"port"`
+	Title              *string          `yaml:"title"`
+	Storage            *string          `yaml:"storage"`
+	Directory          *string          `yaml:"directory"`
+	Styles             *string          `yaml:"styles"`
+	Icons              *bool            `yaml:"icons"`
+	HideDownloads      *bool            `yaml:"hideDownloads"`
+	HideDotfiles       *bool            `yaml:"hideDotfiles"`
+	HideSymlinks       *bool            `yaml:"hideSymlinks"`
+	EnableJS           *bool            `yaml:"enableJs"`
+	EnableZipDownloads *bool            `yaml:"enableZipDownloads"`
+	Heading            *string          `yaml:"heading"`
+	Footer             *string          `yaml:"footer"`
+	Ignore             []*regexp.Regexp `yaml:"ignore"`
+	directory          string
 }
 
 type expectedPrimitive interface {
@@ -46,19 +47,20 @@ func Config() Conf {
 		log.Print(err)
 	}
 	return Conf{
-		Title:         populatePrimitive(cfg.Title, "TITLE", new(string("Index of "))),
-		Storage:       populatePrimitive(cfg.Storage, "STORAGE", new(string(filepath.Join("data", "downloadcount.db")))),
-		Port:          populatePrimitive(cfg.Port, "PORT", new(int(8080))),
-		Directory:     NormalizePath(*populatePrimitive(cfg.Directory, "DIRECTORY", new(string("/srv/http/")))),
-		Icons:         populatePrimitive(cfg.Icons, "ICONS", new(bool(true))),
-		HideDownloads: populatePrimitive(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
-		HideDotfiles:  populatePrimitive(cfg.HideDotfiles, "HIDEDOTFILES", new(bool(true))),
-		HideSymlinks:  populatePrimitive(cfg.HideSymlinks, "HIDESYMLINKS", new(bool(false))),
-		EnableJS:      populatePrimitive(cfg.EnableJS, "ENABLEJS", new(bool(true))),
-		Styles:        populatePrimitive(cfg.Styles, "STYLES", new(string("styles.css"))),
-		Heading:       populatePrimitive(cfg.Heading, "HEADING", new(string("<h1>Index of <span id=\"path\">%path%</span></h1>"))),
-		Footer:        populatePrimitive(cfg.Footer, "FOOTER", new(string(""))),
-		Ignore:        cfg.Ignore,
+		Title:              populatePrimitive(cfg.Title, "TITLE", new(string("Index of "))),
+		Storage:            populatePrimitive(cfg.Storage, "STORAGE", new(string(filepath.Join("data", "downloadcount.db")))),
+		Port:               populatePrimitive(cfg.Port, "PORT", new(int(8080))),
+		Directory:          NormalizePath(*populatePrimitive(cfg.Directory, "DIRECTORY", new(string("/srv/http/")))),
+		Icons:              populatePrimitive(cfg.Icons, "ICONS", new(bool(true))),
+		HideDownloads:      populatePrimitive(cfg.HideDownloads, "HIDEDOWNLOADS", new(bool(false))),
+		HideDotfiles:       populatePrimitive(cfg.HideDotfiles, "HIDEDOTFILES", new(bool(true))),
+		HideSymlinks:       populatePrimitive(cfg.HideSymlinks, "HIDESYMLINKS", new(bool(false))),
+		EnableJS:           populatePrimitive(cfg.EnableJS, "ENABLEJS", new(bool(true))),
+		EnableZipDownloads: populatePrimitive(cfg.EnableZipDownloads, "ENABLEZIPDOWNLOADS", new(bool(false))),
+		Styles:             populatePrimitive(cfg.Styles, "STYLES", new(string("styles.css"))),
+		Heading:            populatePrimitive(cfg.Heading, "HEADING", new(string("<h1>Index of <span id=\"path\">%path%</span></h1>"))),
+		Footer:             populatePrimitive(cfg.Footer, "FOOTER", new(string(""))),
+		Ignore:             cfg.Ignore,
 	}
 }
 

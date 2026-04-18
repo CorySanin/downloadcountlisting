@@ -12,8 +12,16 @@ interface DirApiResponse {
     path: string;
     subdirectories: string[];
     files: FileEntry[];
-    titlePrefix: string;
     dl: boolean;
+}
+
+declare global {
+    interface Window {
+        conf: {
+            title: string,
+            enableZipDownloads: boolean
+        }
+    }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -119,7 +127,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 clearChildren(pathContainer);
                 pathContainer.appendChild(document.createTextNode(respBody.path));
             });
-            document.title = `${respBody.titlePrefix}${respBody.path}`;
+            document.title = `${window.conf.title}${respBody.path}`;
             setUpLinks(anchors);
         }
         catch {
@@ -156,6 +164,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function addCheckboxCols() {
+        if (!window.conf.enableZipDownloads) {
+            return;
+        }
         const trs = document.querySelectorAll('table#list > tbody > tr');
         trs.forEach(tr => {
             const td = document.createElement('td');
@@ -178,7 +189,10 @@ document.addEventListener("DOMContentLoaded", function () {
     }
 
     function setButtonState(force?: boolean) {
-        const btn = downloadButton!;
+        const btn = downloadButton;
+        if (!btn) {
+            return;
+        }
         if (typeof force === 'boolean') {
             btn.disabled = !force;
             return;
@@ -193,6 +207,9 @@ document.addEventListener("DOMContentLoaded", function () {
     window.history.pushState(window.location.href, "", (new URL(window.location.href)).pathname);
     setUpLinks(document.querySelectorAll(".link.directory > a"));
     const downloadButton = (function (element: Element | null) {
+        if (!window.conf.enableZipDownloads) {
+            return null;
+        }
         const button = document.createElement('button');
         if (!element) {
             return button;
@@ -216,7 +233,7 @@ document.addEventListener("DOMContentLoaded", function () {
     })(document.querySelector('table#list > thead > tr'));
     setButtonState();
 
-    downloadButton.addEventListener('click', async _ => {
+    downloadButton?.addEventListener('click', async _ => {
         const checkedFiles: string[] = [];
         const allFiles: string[] = [];
         setLoaderVisibility(true);

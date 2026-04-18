@@ -30,8 +30,14 @@ type (
 		DLTotal  int    `json:"dlTotal"`
 	}
 
+	PageConfig struct {
+		Title              string `json:"title"`
+		EnableZipDownloads bool   `json:"enableZipDownloads"`
+	}
+
 	ListingData struct {
 		ApiListingData
+		PageConfig
 		Title         string
 		Icons         bool
 		HideDownloads bool
@@ -92,6 +98,10 @@ func (s *Server) Handler(w http.ResponseWriter, r *http.Request) {
 				Path:           normalizedDirname,
 				Subdirectories: childDirs,
 				Files:          childFiles,
+			},
+			PageConfig: PageConfig{
+				Title:              *s.conf.Title,
+				EnableZipDownloads: *s.conf.EnableZipDownloads,
 			},
 			Title:         *s.conf.Title,
 			Icons:         *s.conf.Icons,
