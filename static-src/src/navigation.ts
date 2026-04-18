@@ -216,7 +216,7 @@ document.addEventListener("DOMContentLoaded", function () {
             chkbx.checked = false;
             checkedFiles.length > 0 || allFiles.push(chkbx.value);
         });
-        const files = checkedFiles.length > 0 ? checkedFiles : allFiles;
+        const files = (checkedFiles.length > 0 ? checkedFiles : allFiles).map(decodeURIComponent);
         setButtonState(false);
         const url = new URL(window.location.href);
         const resp = await fetch(`${url.protocol}//${url.host}/.api/zip`, {
