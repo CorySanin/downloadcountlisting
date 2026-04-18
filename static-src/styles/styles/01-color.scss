@@ -34,6 +34,7 @@
 
 .loader {
     background-color: var(--nav-background);
+    border-color: var(--table-border);
 
     &::before {
         background-color: var(--nav-border);
