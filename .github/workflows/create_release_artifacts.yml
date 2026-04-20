@@ -70,7 +70,7 @@ jobs:
       contents: write
     env:
       TAG_NAME: ${{ needs.varinit.outputs.TAG_NAME }}
-      ZIP_NAME: ${{ github.event.repository.name }}_${{ needs.varinit.outputs.TAG_NAME }}_${{ matrix.arch }}.zip
+      ZIP_NAME: ${{ github.event.repository.name }}_${{ matrix.arch }}_${{ needs.varinit.outputs.TAG_NAME }}.zip
     steps:
       - name: Check out the repository
         uses: *checkout
@@ -92,8 +92,9 @@ jobs:
 
       - name: Create zip of the repository
         run: |
-          mv main dist/swankyindex
-          zip -r "${{ env.ZIP_NAME }}" dist/
+          mv main dist/swankyindex && \
+          cd dist && \
+          zip -r "${{ env.ZIP_NAME }}" .
 
       - name: Upload zip as a release asset
         uses: softprops/action-gh-release@v3
