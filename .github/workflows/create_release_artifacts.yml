@@ -11,16 +11,13 @@ jobs:
     runs-on: &ubuntux64 ubuntu-24.04
     outputs:
       TAG_NAME: ${{ steps.var.outputs.tag }}
-      ZIP_NAME: ${{ steps.var.outputs.zip }}
     steps:
       - name: Define image variables
         id: var
         run: |
           raw_tag="${GITHUB_REF##*/}"
           tag="${raw_tag#v}"  # Remove leading "v" if present
-          repo_name="${{ github.event.repository.name }}"
           echo "tag=$tag" >> $GITHUB_OUTPUT
-          echo "zip=${repo_name}_${tag}_${{ matrix.arch }}.zip" >> $GITHUB_OUTPUT
 
 
   build-static:
@@ -73,7 +70,7 @@ jobs:
       contents: write
     env:
       TAG_NAME: ${{ needs.varinit.outputs.TAG_NAME }}
-      ZIP_NAME: ${{ needs.varinit.outputs.ZIP_NAME }}
+      ZIP_NAME: ${{ github.repository }}_${{ needs.varinit.outputs.TAG_NAME }}_${{ matrix.arch }}.zip
     steps:
       - name: Check out the repository
         uses: *checkout
