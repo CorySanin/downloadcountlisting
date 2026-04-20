@@ -88,11 +88,12 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: static_${{ env.TAG_NAME }}
-          path: dist/
+          path: dist/static/
 
       - name: Create zip of the repository
         run: |
           mv main dist/swankyindex && \
+          cp LICENSE dist/ && \
           cd dist && \
           zip -r "../${{ env.ZIP_NAME }}" .
 
