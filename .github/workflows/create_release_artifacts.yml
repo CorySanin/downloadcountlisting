@@ -94,7 +94,7 @@ jobs:
         run: |
           mv main dist/swankyindex && \
           cd dist && \
-          zip -r "${{ env.ZIP_NAME }}" .
+          zip -r "../${{ env.ZIP_NAME }}" .
 
       - name: Upload zip as a release asset
         uses: softprops/action-gh-release@v3
