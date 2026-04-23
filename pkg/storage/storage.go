@@ -43,6 +43,12 @@ type (
 		All    int
 		Recent int
 	}
+
+	TotalsRow struct {
+		Filename     string
+		AccessDomain string
+		Count        int
+	}
 )
 
 func (store *Storage) RemoveDownloads(dls []DownloadIndex) error {
@@ -79,6 +85,40 @@ func (store *Storage) IncrementDownload(params Download) {
 	if _, err := store.db.Exec("INSERT INTO downloads (Path,Filename,AccessDomain,UserAgent,Timestamp) VALUES (?, ?, ?, ?, ?)", params.Path, params.Filename, params.AccessDomain, params.UserAgent, time.Now()); err != nil {
 		log.Printf("Failed to insert download: %v", err)
 	}
+}
+
+func (store *Storage) GetTotalsByFileAndAccessDomain(c chan []TotalsRow) {
+	m, err := store.getTotalsByFileAndAccessDomain()
+	if err != nil {
+		c <- nil
+		log.Printf("Failed to get totals: %v", err)
+		return
+	}
+	c <- m
+}
+
+func (store *Storage) getTotalsByFileAndAccessDomain() ([]TotalsRow, error) {
+	t, err := store.db.Query("SELECT Path, Filename, AccessDomain, count() as Count FROM downloads GROUP BY Path, Filename, AccessDomain")
+	if err != nil {
+		return nil, fmt.Errorf("failed to get total downloads: %v", err)
+	}
+	defer t.Close()
+	results := make([]TotalsRow, 0)
+	for t.Next() {
+		var path string
+		var filename string
+		var accessDomain string
+		var count int
+		if err := t.Scan(&path, &filename, &accessDomain, &count); err != nil {
+			return nil, err
+		}
+		results = append(results, TotalsRow{
+			Filename:     path + filename,
+			AccessDomain: accessDomain,
+			Count:        count,
+		})
+	}
+	return results, nil
 }
 
 func (store *Storage) GetTotalsByPath(path string, c chan map[string]Totals) {
