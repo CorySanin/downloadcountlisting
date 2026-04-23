@@ -43,6 +43,8 @@ heading: | # ENV:HEADING - HTML to appear before the index. %path% becomes the p
     <h1>Index of <span id=\"path\">%path%</span></h1>
 footer: "" # ENV:FOOTER - HTML to appear after the index. %path% becomes the path name.
 ignore: [] # List of regular expressions. Files that match will be hidden from the index.
+prometheusPort: -1 # ENV:PROMPORT - Port to run prometheus client on. -1 disables prometheus and 0 uses the same port (see prometheusPath)
+prometheusPath: /metrics # ENV:PROMPATH - Path to acces Prometheus metrics if operating under a single port
 ```
 
 ## Building
