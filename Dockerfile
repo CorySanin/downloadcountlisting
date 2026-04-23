@@ -39,11 +39,17 @@ FROM ${BASE_IMG}:${BASE_IMG_TAG} AS user-creator
 RUN addgroup --system --gid 1000 user && \
     adduser --system --no-create-home --disabled-password --gid 1000 --uid 1000 user
 
+WORKDIR /staging
+RUN mkdir etc tmp && \
+    chmod 1777 ./tmp && \
+    chmod 1755 ./etc && \
+    cp /etc/passwd ./etc/
+
 FROM scratch AS deploy
 
 WORKDIR /srv
 
-COPY --link --from=user-creator /etc/passwd /etc/passwd
+COPY --link --from=user-creator /staging/ /
 COPY --link --from=static /usr/src/static/staging/ .
 COPY --link --from=builder --chown=root:root /download-count-listing /download-count-listing
 
