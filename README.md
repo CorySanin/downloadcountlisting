@@ -4,6 +4,7 @@
 [![GitHub Release](https://img.shields.io/github/v/release/CorySanin/swankyindex)](https://github.com/CorySanin/swankyindex/releases/latest)
 [![Docker Image Size](https://img.shields.io/docker/image-size/corysanin/swankyindex)](https://github.com/CorySanin/swankyindex/pkgs/container/swankyindex)
 [![Docker Pulls](https://img.shields.io/docker/pulls/corysanin/swankyindex)](https://hub.docker.com/r/corysanin/swankyindex)
+[![Go Report Card](https://goreportcard.com/badge/github.com/CorySanin/swankyindex)](https://goreportcard.com/report/github.com/CorySanin/swankyindex)
 
 
 A souped-up fancyindex alternative with download stats.
